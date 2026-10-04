@@ -26,7 +26,6 @@ env:
   VERSION: 1.5.0
   NDK_VERSION: r28c
   UPLOAD_ARTIFACT: "true"
-  CACHE_ON_FAILURE: "true"
 jobs:
   generate-bridge:
     uses: ./.github/workflows/db9-bridge.yml
@@ -113,6 +112,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           prefix-key: ${{ matrix.job.os }}
+          cache-on-failure: true
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
         with:
@@ -324,6 +324,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           prefix-key: ${{ matrix.job.os }}
+          cache-on-failure: true
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
