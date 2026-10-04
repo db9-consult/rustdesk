@@ -7,6 +7,14 @@ import tarfile
 
 root = pathlib.Path(__file__).resolve().parents[2]
 output = root / "output"
+windows_output = output / "SignOutput"
+if windows_output.is_dir():
+    for path in windows_output.iterdir():
+        if path.is_file():
+            destination = output / path.name
+            if destination.exists():
+                raise RuntimeError(f"Duplicate release file: {path.name}")
+            path.rename(destination)
 expected = [
     "rustdesk-db9-1.5.0-x86_64.exe",
     "rustdesk-db9-1.5.0-x86_64.msi",
