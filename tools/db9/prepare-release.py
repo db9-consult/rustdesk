@@ -15,6 +15,7 @@ if windows_output.is_dir():
             if destination.exists():
                 raise RuntimeError(f"Duplicate release file: {path.name}")
             path.rename(destination)
+    windows_output.rmdir()
 expected = [
     "rustdesk-db9-1.5.0-x86_64.exe",
     "rustdesk-db9-1.5.0-x86_64.msi",
