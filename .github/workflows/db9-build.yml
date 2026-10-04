@@ -26,6 +26,7 @@ env:
   VERSION: 1.5.0
   NDK_VERSION: r28c
   UPLOAD_ARTIFACT: "true"
+  CACHE_ON_FAILURE: "true"
 jobs:
   generate-bridge:
     uses: ./.github/workflows/db9-bridge.yml
