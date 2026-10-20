@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import struct
 import subprocess
 import tarfile
@@ -12,8 +13,12 @@ output = root / "output"
 apk = output / "rustdesk-db9-1.5.0-aarch64.apk"
 certificate = "3334cdf00b267487cc5f3565bf601954485d55a7830478e08244246405a1e9b7"
 signature = (output / "db9-android-signature.txt").read_text()
-if f"Signer #1 certificate SHA-256 digest: {certificate}" not in signature:
-    raise ValueError("APK is not signed with the permanent DB9 certificate")
+signers = {
+    digest.lower()
+    for digest in re.findall(r"^Signer[^\r\n]* certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$", signature, re.MULTILINE)
+}
+if signers != {certificate}:
+    raise ValueError(f"Expected permanent DB9 certificate {certificate}; found {sorted(signers)}")
 badging = (output / "db9-android-package.txt").read_text()
 for expected in ["package: name='com.db9consult.rustdesk'", "versionName='1.5.0'", "native-code: 'arm64-v8a'", "application-label:'RustDesk DB9'"]:
     if expected not in badging:

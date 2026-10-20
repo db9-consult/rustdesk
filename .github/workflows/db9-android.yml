@@ -91,12 +91,14 @@ jobs:
           flutter pub get
           flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name 1.5.0 --build-number 68
       - name: Verify APK and package sources
+        id: verify
         run: |
+          set -euo pipefail
           mkdir -p output
           cp flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output/rustdesk-db9-1.5.0-aarch64.apk
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs output/rustdesk-db9-1.5.0-aarch64.apk > output/db9-android-signature.txt
-          "$BUILD_TOOLS/aapt" dump badging output/rustdesk-db9-1.5.0-aarch64.apk > output/db9-android-package.txt
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs output/rustdesk-db9-1.5.0-aarch64.apk | tee output/db9-android-signature.txt
+          "$BUILD_TOOLS/aapt" dump badging output/rustdesk-db9-1.5.0-aarch64.apk | tee output/db9-android-package.txt
           python3 tools/db9/package-android.py
       - name: Remove signing material
         if: always()
@@ -106,6 +108,12 @@ jobs:
           name: db9-android-arm64
           path: output/*
           if-no-files-found: error
+      - name: Preserve APK verification diagnostics
+        if: ${{ failure() && steps.verify.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: db9-android-diagnostics
+          path: output/*
   publish:
     needs: build
     runs-on: ubuntu-24.04
