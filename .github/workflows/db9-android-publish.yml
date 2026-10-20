@@ -1,0 +1,90 @@
+name: Verify and publish existing DB9 Android build
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Android build run with a signed APK diagnostics artifact
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: db9-android-1.5.0
+  cancel-in-progress: false
+jobs:
+  verify-publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN: ${{ inputs.build_run }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Identify exact build sources
+        id: source
+        run: |
+          echo "sha=$(gh run view "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          submodules: recursive
+          path: source
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: bridge-artifact
+          path: source
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: db9-android-diagnostics
+          path: source/output
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ github.token }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: "3.24.5"
+          cache: true
+      - name: Reconstruct and confirm dependency lock
+        working-directory: source/flutter
+        run: |
+          flutter pub get
+          flutter pub deps --json > ../output/android-dependencies.json
+      - name: Verify original dependency versions
+        run: python3 tools/db9/verify-android-dependencies.py
+      - name: Restore exact Android package configuration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          android = Path('source/flutter/android')
+          gradle = android / 'app/build.gradle'
+          gradle.write_text(gradle.read_text().replace('applicationId "com.carriez.flutter_hbb"', 'applicationId "com.db9consult.rustdesk"'))
+          manifest = android / 'app/src/main/AndroidManifest.xml'
+          manifest.write_text(manifest.read_text().replace('android:label="RustDesk"', 'android:label="RustDesk DB9"'))
+          properties = android / 'gradle.properties'
+          properties.write_text(properties.read_text().replace('-Xmx1024M', '-Xmx4g'))
+          PY
+          cp tools/db9/package-android.py source/tools/db9/package-android.py
+      - name: Independently verify signature and package delivery
+        working-directory: source
+        env:
+          DB9_ANDROID_BUILD_RUN: ${{ inputs.build_run }}
+          DB9_ANDROID_PACKAGING_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs output/rustdesk-db9-1.5.0-aarch64.apk | tee output/db9-android-signature.txt
+          "$BUILD_TOOLS/aapt" dump badging output/rustdesk-db9-1.5.0-aarch64.apk > output/db9-android-package.txt
+          python3 tools/db9/package-android.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: db9-android-arm64
+          path: source/output/*
+          if-no-files-found: error
+      - name: Publish validated Android delivery
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload 1.5.0-db9.1 source/output/*

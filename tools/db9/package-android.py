@@ -15,7 +15,7 @@ certificate = "3334cdf00b267487cc5f3565bf601954485d55a7830478e08244246405a1e9b7"
 signature = (output / "db9-android-signature.txt").read_text()
 signers = {
     digest.lower()
-    for digest in re.findall(r"^Signer[^\r\n]* certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$", signature, re.MULTILINE)
+    for digest in re.findall(r"^(?:V[0-9.]+ Signer:|Signer[^\r\n]*) certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$", signature, re.MULTILINE)
 }
 if signers != {certificate}:
     raise ValueError(f"Expected permanent DB9 certificate {certificate}; found {sorted(signers)}")
@@ -41,6 +41,7 @@ metadata = {
     "upstream_version": "1.5.0",
     "desktop_release_source": "db108f7906ce13e9957a0a67f93c328afd3d4792",
     "fork_commit": git("rev-parse", "HEAD"),
+    "packaging_commit": os.environ.get("DB9_ANDROID_PACKAGING_COMMIT", git("rev-parse", "HEAD")),
     "hbb_common_commit": git("rev-parse", "HEAD", cwd=root / "libs/hbb_common"),
     "application_id": "com.db9consult.rustdesk",
     "abi": "arm64-v8a",
@@ -48,7 +49,8 @@ metadata = {
     "id_server": "rustdesk.db9consult.com.br",
     "relay_server": "rustdesk.db9consult.com.br",
     "key": "dksPMYTN32cCIMoIhBsKh5MZzYIAYt70xQxIiYZqSiQ=",
-    "workflow_run": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+    "workflow_run": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ.get('DB9_ANDROID_BUILD_RUN', os.environ['GITHUB_RUN_ID'])}",
+    "validation_run": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
     "device_validation": "Pending: no authorized Android ARM64 device attached to the build runner.",
 }
 (output / "android-build-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
